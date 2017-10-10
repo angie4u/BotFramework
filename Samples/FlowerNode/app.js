@@ -11,6 +11,9 @@ var connector = new builder.ChatConnector({
     appPassword: process.env.MICROSOFT_APP_PASSWORD
 });
 
+var luisAppUrl = process.env.LUIS_APP_URL || 'https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/0c66a7dd-96d5-442d-84c5-1a3c09300707?subscription-key=c4ac39be736d47598ab8ca33b5cccd7c&verbose=true&timezoneOffset=0&q=';
+
+
 server.post('/api/messages',connector.listen());
 
 var bot = new builder.UniversalBot(connector, [
@@ -24,26 +27,12 @@ var bot = new builder.UniversalBot(connector, [
         session.userData.profile = results.response;
         //session.send('사용자 정보')
         //session.send(`${session.userData.profile.name}, ${session.userData.profile.homeAddress}, ${session.userData.profile.phoneNumber}`);        
-       
-        session.beginDialog('order');  
-    },
-    function(session,results){
-        session.dialogData.order = results.response;
-        //session.send(`Type ${session.dialogData.order.type} 을(를) 선택하셨습니다.`);
-        if(session.dialogData.order.type == '1')
-        {
-            session.beginDialog('softbyEvent');  
-        }
-        else if(session.dialogData.order.type == '2')
-        {
-            session.beginDialog('softbyPrice');  
-        }
-        else if(session.dialogData.order.type == '3')
-        {
-            session.beginDialog('softbyFlowerType');  
-        }
+               
+        session.send('원하는 서비스를 입력하세요(예시: 꽃 선물 / 꽃꽃이 강좌안내 / 꽃 추천)');        
     }
 ]);
+
+bot.recognizer(new builder.LuisRecognizer(luisAppUrl));
 
 bot.dialog('greeting',[
     function(session){                
@@ -94,7 +83,9 @@ bot.dialog('getUserData',[
 ]);
 
 bot.dialog('order',[
-    function(session){
+    function(session,args){
+        //var intent = args.intent;
+        //console.log(`intent: %s`,intent);
         session.send('꽃 주문을 하기 위한 dialog 입니다...');
         session.dialogData.order = {};
 
@@ -108,15 +99,47 @@ bot.dialog('order',[
         builder.Prompts.text(session,"원하는 타입의 옵션을 선택하시기 바랍니다!");        
         
     },
-    function(session,results){       
-        //session.endDialogWithResult({response:session.dialogData.order}); 
-        console.log('debugging point3');
-        if(results.response){
-            session.dialogData.order.type = results.response;            
-            session.endDialogWithResult({response:session.dialogData.order});
+    function(session,results){
+        session.dialogData.order.type = results.response;       
+        if(session.dialogData.order.type == '1')
+        {
+            session.beginDialog('softbyEvent');  
+        }
+        else if(session.dialogData.order.type == '2')
+        {
+            session.beginDialog('softbyPrice');  
+        }
+        else if(session.dialogData.order.type == '3')
+        {
+            session.beginDialog('softbyFlowerType');  
         }
     }
-]);
+]).triggerAction({
+    matches: 'FlowerOrder'
+});
+
+
+bot.dialog('search',[
+    function(session,args){
+        // var intent = args.intent;        
+        // console.log('intent: %s',intent);
+        session.send('꽃 검색을 하기 위한 dialog 입니다...').endDialog();
+    }
+]).triggerAction({
+    matches: 'FlowerSearch'
+});
+
+
+bot.dialog('class',[
+    function(session,args){
+        // var intent = args.intent;        
+        // console.log('intent: %s',intent);
+        session.send('꽃꽃이 강좌 신청을 위한 dialog 입니다...').endDialog();
+    }
+]).triggerAction({
+    matches: 'FlowerClass'
+});
+
 
 bot.dialog('softbyEvent',[
     function(session){
