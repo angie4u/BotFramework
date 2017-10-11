@@ -7,9 +7,13 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
-    "botbuilder": "^3.11.0",
-    "restify": "^6.0.1"
+    "botbuilder": "^3.8.2",
+    "dotenv-extended": "^1.0.4",
+    "request": "^2.79.0",
+    "restify": "^4.3.0",
+    "url": "^0.11.0",
+    "valid-url": "^1.0.9"
   }
 }

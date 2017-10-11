@@ -1,5 +1,12 @@
 var restify = require('restify');
-var builder = require('botbuilder');
+var builder = require('botbuilder'),
+    request = require('request').defaults({ encoding: null }),
+    url = require('url'),    
+    validUrl = require('valid-url'),
+    imageService = require('./image-service');
+
+    
+var MAX_CARD_COUNT = 10;
 
 var server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3978, function(){
@@ -11,15 +18,18 @@ var connector = new builder.ChatConnector({
     appPassword: process.env.MICROSOFT_APP_PASSWORD
 });
 
-var luisAppUrl = process.env.LUIS_APP_URL || 'https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/0c66a7dd-96d5-442d-84c5-1a3c09300707?subscription-key=c4ac39be736d47598ab8ca33b5cccd7c&verbose=true&timezoneOffset=0&q=';
 
+//var luisAppUrl = process.env.LUIS_APP_URL || 'https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/0c66a7dd-96d5-442d-84c5-1a3c09300707?subscription-key=c4ac39be736d47598ab8ca33b5cccd7c&verbose=true&timezoneOffset=0&q=';
+var luisAppUrl = 'https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/0c66a7dd-96d5-442d-84c5-1a3c09300707?subscription-key=c4ac39be736d47598ab8ca33b5cccd7c&verbose=true&timezoneOffset=0&q=';
+
+
+var MAX_CARD_COUNT = 10;
+
+//var imageService = require('./image-service');
 
 server.post('/api/messages',connector.listen());
 
-var bot = new builder.UniversalBot(connector, [
-    function(session){
-        session.beginDialog('greeting');
-    },
+var bot = new builder.UniversalBot(connector, [    
     function(session){
         session.beginDialog('getUserData',session.userData.profile);
     },
@@ -28,18 +38,26 @@ var bot = new builder.UniversalBot(connector, [
         //session.send('사용자 정보')
         //session.send(`${session.userData.profile.name}, ${session.userData.profile.homeAddress}, ${session.userData.profile.phoneNumber}`);        
                
-        session.send('원하는 서비스를 입력하세요(예시: 꽃 선물 / 꽃꽃이 강좌안내 / 꽃 추천)');        
+        session.send('원하는 서비스를 입력하세요(예시: 꽃 선물 / 꽃꽃이 강좌안내 / 꽃 이미지 검색)');        
     }
 ]);
+
+bot.on('conversationUpdate',function(message){
+    if(message.membersAdded){
+        message.membersAdded.forEach(function(identity){
+            if(identity.id === message.address.bot.id){
+                var reply = new builder.Message()
+                    .address(message.address)
+                    .text('안녕하세요, 꽃과 관련된 서비스를 하는 봇 입니다!');
+                bot.send(reply);
+            }           
+        });
+    }
+});
+
 
 bot.recognizer(new builder.LuisRecognizer(luisAppUrl));
 
-bot.dialog('greeting',[
-    function(session){                
-        session.send("안녕하세요! 꽃과 관련된 서비스를 하는 봇 입니다.");
-        session.endDialog();
-    }
-]);
 
 bot.dialog('getUserData',[
     function(session,args,next){
@@ -76,8 +94,7 @@ bot.dialog('getUserData',[
             session.dialogData.profile.phoneNumber = results.response;
             session.send("사용자 정보 입력이 완료되었습니다. 감사합니다!");
         }
-        session.endDialogWithResult({response: session.dialogData.profile});
-    
+        session.endDialogWithResult({response: session.dialogData.profile});    
     }
 
 ]);
@@ -120,10 +137,21 @@ bot.dialog('order',[
 
 
 bot.dialog('search',[
-    function(session,args){
-        // var intent = args.intent;        
-        // console.log('intent: %s',intent);
-        session.send('꽃 검색을 하기 위한 dialog 입니다...').endDialog();
+    function(session){        
+        //session.send('꽃 이름을 입력하시면 Bing Image 검색 결과를 보여드립니다!');
+        builder.Prompts.text(session,'꽃 이름을 입력하시면 Bing Image 검색 결과를 보여드립니다!');
+    },
+    function(session,results){
+        var flowerName = results.response;
+        if(flowerName){
+            imageService
+                .getFlowerImageByName(flowerName)
+                .then(function(value){ handleApiResponse(session, value); })
+                .catch(function(error) { handleErrorResponse(session,error); });
+        }else{
+            session.send('이름 맞게 입력하신거 맞죠??');
+        }               
+   
     }
 ]).triggerAction({
     matches: 'FlowerSearch'
@@ -144,8 +172,7 @@ bot.dialog('class',[
 bot.dialog('softbyEvent',[
     function(session){
         session.dialogData.event = {};
-        //session.send('softbyEvent 다이얼로그');    
-        //session.send(`1. 생일 기념일\n 2. `)    
+        //session.send('softbyEvent 다이얼로그');          
         builder.Prompts.text(session, `해당하는 이벤트 번호를 입력하세요\n1. 생일 기념일\n 2. 승진, 취업\n3.개업, 집들이\n4. 졸업식, 연주회`);
     },
     function(session,results){
@@ -189,37 +216,43 @@ function getCardAttachments(session){
     ];
 }
 
-function createThumbnailCard(session){
-    return [
-        new builder.ThumbnailCard(session)
-            .title()
-            .subtitle()
-            .text()
-            .images([
-                builder.CardImage.create(session,'')
-            ])
-            .buttons([
-                builder.CardAction.openUrl(session,'','더 알아보기')
-            ]),
-        new builder.ThumbnailCard(session)
-            .title()
-            .subtitle()
-            .text()
-            .images([
-                builder.CardImage.create(session,'')
-            ])
-            .buttons([
-                builder.CardAction.openUrl(session,'','더 알아보기')
-            ]),
-        new builder.ThumbnailCard(session)
-            .title()
-            .subtitle()
-            .text()
-            .images([
-                builder.CardImage.create(session,'')
-            ])
-            .buttons([
-                builder.CardAction.openUrl(session,'','더 알아보기')
-            ]),
-    ]
+
+function handleApiResponse(session, images){
+    if(images && images.constructor === Array && images.length > 0){
+
+        //session.sendTyping();
+        var productCount = Math.min(MAX_CARD_COUNT, images.length);
+
+        var cards = new Array();
+        for(var i=0; i<productCount; i++){
+            cards.push(constructCard(session,images[i]));
+        }
+
+        var reply = new builder.Message(session)
+            .text('이미지 검색 결과입니다 :)')
+            .attachmentLayout(builder.AttachmentLayout.carousel)
+            .attachments(cards);
+        session.send(reply);
+    }else{
+        session.send('해당 검색어에 해당하는 꽃을 찾지 못했습니다 :(');
+    }
 }
+
+function constructCard(session, image){
+    return new builder.HeroCard(session)
+        .title(image.name)
+        .subtitle(image.hostPageDisplayUrl)
+        .images([
+            builder.CardImage.create(session,image.thumbnailUrl)
+        ])
+        .buttons([
+            builder.CardAction.openUrl(session, image.hostPageUrl, '웹 페이지 열기'),
+            builder.CardAction.openUrl(session,image.webSearchUrl,'더 검색하기')
+        ]);
+}
+
+function handleErrorResponse(session, error){
+    session.send("뭔가가 잘못되었습니다;; 조금 후에 다시 시도해주세요!");
+    console.error(error);
+}
+
