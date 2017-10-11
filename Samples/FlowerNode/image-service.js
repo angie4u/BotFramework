@@ -20,7 +20,7 @@ exports.getFlowerImageByName = function(name){
         function(resolve,reject){
             console.log('%s',name);
             var requestData = {
-                url: BING_API_URL + '&q='+name,
+                url: BING_API_URL + '&q='+encodeURI(name,'UTF-8'),
                 headers:{
                     'Ocp-Apim-Subscription-Key': 'e256c5f32e6241c9b7622c617d7e2b27'
                 },
