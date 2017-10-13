@@ -101,9 +101,7 @@ bot.dialog('getUserData',[
 
 bot.dialog('order',[
     function(session,args){
-        //var intent = args.intent;
-        //console.log(`intent: %s`,intent);
-        session.send('꽃 주문을 하기 위한 dialog 입니다...');
+        session.send('사랑하는 사람에게 꽃을 선물해 보세요!');
         session.dialogData.order = {};
 
         var cards = getCardAttachments();
@@ -111,7 +109,6 @@ bot.dialog('order',[
             .attachmentLayout(builder.AttachmentLayout.carousel)
             .attachments(cards);
           
-        //builder.Prompts.text(session,"hello");
         session.send(reply);
         builder.Prompts.text(session,"원하는 타입의 옵션을 선택하시기 바랍니다!");        
         
@@ -139,10 +136,10 @@ bot.dialog('order',[
 bot.dialog('search',[
     function(session){        
         //session.send('꽃 이름을 입력하시면 Bing Image 검색 결과를 보여드립니다!');
-        builder.Prompts.text(session,'꽃 이름을 입력하시면 Bing Image 검색 결과를 보여드립니다!');
+        builder.Prompts.text(session,`꽃 이름을 입력하시면 Bing Image 검색 결과를 보여드립니다!`);
     },
-    function(session,results){
-        var flowerName = results.response;
+    function(session,results){        
+        var flowerName = results.response;        
         if(flowerName){
             imageService
                 .getFlowerImageByName(flowerName)
@@ -150,19 +147,37 @@ bot.dialog('search',[
                 .catch(function(error) { handleErrorResponse(session,error); });
         }else{
             session.send('이름 맞게 입력하신거 맞죠??');
-        }               
+        }                 
    
-    }
+    },
+    
 ]).triggerAction({
     matches: 'FlowerSearch'
 });
 
 
 bot.dialog('class',[
+    
     function(session,args){
-        // var intent = args.intent;        
-        // console.log('intent: %s',intent);
-        session.send('꽃꽃이 강좌 신청을 위한 dialog 입니다...').endDialog();
+        session.dialogData.class = {};
+
+        session.send('kukka 플라워 클래스를 안내해 드립니다!');
+        builder.Prompts.text(session, `원하는 지점을 선택해주세요\n1.이태원점\n2.광화문점`);
+    },
+    function(session,results){
+        session.dialogData.class.location = results.response;
+        builder.Prompts.text(session, `수강하고 싶은 클래스를 선택해주세요!\n1.입문반\n2.중급반\n3.고급반\n4.핸드타이드\n5.웨딩\n6.드라이플라워`);
+    },
+    function(session,results){
+        session.dialogData.class.type = results.response;
+        builder.Prompts.text(session, `원하는 날짜를 선택해주세요\n1.10월 13일\n2.10월 14일\n3.10월 15일`);
+    },
+    function(session,results){
+        session.dialogData.class.date = results.response;
+        var classInfo = `선택하신 옵션은: ${session.dialogData.class.location}, ${session.dialogData.class.type}, ${session.dialogData.class.date} 입니다.`;
+             
+        session.send(classInfo);
+        session.send('성공적으로 예약되었습니다. 신청해주셔서 감사합니다 ;)').endDialogWithResult(session.dialogData.class);
     }
 ]).triggerAction({
     matches: 'FlowerClass'
