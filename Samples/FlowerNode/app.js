@@ -3,7 +3,10 @@ var builder = require('botbuilder'),
     request = require('request').defaults({ encoding: null }),
     url = require('url'),    
     validUrl = require('valid-url'),
-    imageService = require('./image-service');
+    imageService = require('./image-service'),
+    //카카오에서 구현해야 하는 것들 때문에 별도 추가
+    kakao_keyboard = require('./kakao/keyboard'),
+    kakao_message = require('./kakao/message');
 
     
 var MAX_CARD_COUNT = 10;
@@ -26,6 +29,8 @@ var luisAppUrl = 'https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/0c66
 var MAX_CARD_COUNT = 10;
 
 //var imageService = require('./image-service');
+
+
 
 server.post('/api/messages',connector.listen());
 
