@@ -4,10 +4,7 @@ var builder = require('botbuilder'),
     url = require('url'),    
     validUrl = require('valid-url'),
     imageService = require('./image-service'),
-    //카카오에서 구현해야 하는 것들 때문에 별도 추가
-    kakao_keyboard = require('./kakao/keyboard'),
-    kakao_message = require('./kakao/message');
-
+    
     
 var MAX_CARD_COUNT = 10;
 
@@ -31,8 +28,19 @@ var MAX_CARD_COUNT = 10;
 //var imageService = require('./image-service');
 
 
-
+server.get('/api/keyboard', function create(req, res) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');    
+    return res.json({
+    //"type" : "text"
+    "type" : "buttons",
+    "buttons" : ["선택 1", "선택 2", "선택 3"]
+    });
+});
 server.post('/api/messages',connector.listen());
+
+
+
+
 
 var bot = new builder.UniversalBot(connector, [    
     function(session){
@@ -198,6 +206,7 @@ bot.dialog('softbyEvent',[
     function(session,results){
         session.dialogData.event = results.response;
         session.endDialog();
+        
     }
 ]);
 
