@@ -10,6 +10,8 @@
   "license": "MIT",
   "dependencies": {
     "botbuilder": "^3.8.2",
+    "botbuilder-azure": "^3.0.4",
+    "botbuilder-cognitiveservices": "^1.1.0",
     "dotenv-extended": "^1.0.4",
     "request": "^2.79.0",
     "restify": "^4.3.0",
