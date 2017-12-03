@@ -26,10 +26,10 @@ var azureTableClient = new azure.AzureTableClient(tableName, storageName, storag
 var tableStorage = new azure.AzureBotStorage({ gzipData: false }, azureTableClient);
 
 // Set up for qna maker dialog
-var recognizer = new cognitiveservices.QnAMakerRecognizer({
-    knowledgeBaseId: 'f33c9325-c60b-4c57-9983-675a4a737fbc',
-    subscriptionKey: '15745d9b221e41c593222171882b6efa'
-});
+// var recognizer = new cognitiveservices.QnAMakerRecognizer({
+//     knowledgeBaseId: 'f33c9325-c60b-4c57-9983-675a4a737fbc',
+//     subscriptionKey: '15745d9b221e41c593222171882b6efa'
+// });
 
 // var BasicQnAMakerDialog = new cognitiveservices.QnAMakerDialog({ 
 // 	recognizers: recognizer,
@@ -98,6 +98,39 @@ function getCardAttachments(session) {
     ];
 }
 
+var qnaFunction = function(session,question){
+    var lQnaMakerServiceEndpoint = 'https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/';
+    var lQnaApi = 'generateAnswer';
+    var lKnowledgeBaseId = 'f33c9325-c60b-4c57-9983-675a4a737fbc';
+    var lSubscriptionKey = '15745d9b221e41c593222171882b6efa';
+    //var lHtmlentities = new entities.AllHtmlEntities();
+    var lKbUri = lQnaMakerServiceEndpoint + lKnowledgeBaseId + '/' + lQnaApi;
+    request({
+        url: lKbUri,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Ocp-Apim-Subscription-Key': lSubscriptionKey
+        },
+        body: '{"question":"' + question + '"}'
+    },
+    function (error, response, body){
+        var lResult;
+        var stopQNA;
+        if(!error){
+            lResult = JSON.parse(body);
+            //lResult.answer = lHtmlentities.decode(lResult.answers);
+        }else{
+            lResult.answer = "Unfortunately an error occurred. Try again.(fQnAMaker)";
+            lResult.score = 0;
+        }
+        
+        session.send(lResult.answers[0].answer);        
+        //session.send('처음으로 돌아가고 싶으신 경우 "홈"을 입력해주세요');
+        builder.Prompts.text(session, "궁금하신 것들을 말씀해주세요!");
+        
+    })
+}
 
 var bot = new builder.UniversalBot(connector, [
     // function(session){
@@ -291,31 +324,68 @@ bot.dialog('class', [
     matches: 'FlowerClass'
 });
 
-var qnamaker = new cognitiveservices.QnAMakerDialog({
-    recognizers: [recognizer],
-    defaultMessage: 'No match! Try changing the query terms!',
-    qnaThreshold: 0.5
-});
-qnamaker.
+// var qnamaker = new cognitiveservices.QnAMakerDialog({
+//     recognizers: [recognizer],
+//     defaultMessage: 'No match! Try changing the query terms!',
+//     qnaThreshold: 0.5
+// });
+
 
 bot.dialog('qnamaker', [
-    function (session, results) {
-        if (session.message.text == "그만") {
+    function (session) {
+        // if (session.message.text == "그만") {
+        //     session.endDialog();
+        // }
+        // else {
+        //     builder.Prompts.text(session, "궁금하신 것들을 말씀해주세요!");
+        // }
+        session.send('안녕하세요 qna dialog 입니다!');
+        builder.Prompts.text(session,'긍금하신 것을 입력하시기 바랍니다.');
+    },
+    function (session, results) { 
+        if(results.response.text == '그만'){
             session.endDialog();
         }
-        else {
-            builder.Prompts.text(session, "궁금하신 것들을 말씀해주세요!");
-        }
-    },
-    function (session, results) {
-        var utterance2 = results.response;
-        var reply = new cognitiveservices.QnAMakerDialog({
-            recognizers: [recognizer],
-            defaultMessage: 'No match! Try changing the query terms!',
-            qnaThreshold: 0.5
-        });
 
-    }
+        var question = results.response;
+        //qnaFunction(session,question);
+        //session.endDialog();
+
+        //qna 호출
+        var lQnaMakerServiceEndpoint = 'https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/';        
+        var lQnaApi = 'generateAnswer';
+        var lKnowledgeBaseId = 'f33c9325-c60b-4c57-9983-675a4a737fbc';
+        var lSubscriptionKey = '15745d9b221e41c593222171882b6efa';
+        //var lHtmlentities = new entities.AllHtmlEntities();
+        var lKbUri = lQnaMakerServiceEndpoint + lKnowledgeBaseId + '/' + lQnaApi;
+        request({
+            url: lKbUri,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Ocp-Apim-Subscription-Key': lSubscriptionKey
+            },
+            body: '{"question":"' + question + '"}'
+        },
+        function (error, response, body){
+            var lResult;
+            var stopQNA;
+            if(!error){
+                lResult = JSON.parse(body);
+                //lResult.answer = lHtmlentities.decode(lResult.answers);
+            }else{
+                lResult.answer = "Unfortunately an error occurred. Try again.(fQnAMaker)";
+                lResult.score = 0;
+            }
+            
+            session.send(lResult.answers[0].answer);        
+            session.send('처음으로 돌아가고 싶으신 경우 "그만"을 입력해주세요');
+            //builder.Prompts.text(session, "궁금하신 것들을 말씀해주세요!");
+            
+        })
+
+
+    },
 ]);
 
 
