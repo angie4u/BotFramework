@@ -13,6 +13,8 @@
     "botbuilder-azure": "^3.0.4",
     "botbuilder-cognitiveservices": "^1.1.0",
     "dotenv-extended": "^1.0.4",
+    "googleapis": "^23.0.0",
+    "jimp": "^0.2.28",
     "request": "^2.79.0",
     "restify": "^4.3.0",
     "url": "^0.11.0",

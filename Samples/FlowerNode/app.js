@@ -7,6 +7,9 @@ var restify = require('restify'),
     azure = require('botbuilder-azure'),
     cognitiveservices = require('botbuilder-cognitiveservices');
 
+var google = require('googleapis');
+var oAuth2 = google.auth.OAuth2;
+
 var documentDbOptions = {
     host: 'flowergallery.documents.azure.com',
     masterKey: 'OKT5Wv0e7B41FaHcSbhBs24kVCK5agY9yOOklhhopKZQ23IspdH4ecxfUkXfEgWPz7vS3q6e1TfJEibre9mLCw==',
@@ -38,9 +41,27 @@ var tableStorage = new azure.AzureBotStorage({ gzipData: false }, azureTableClie
 
 
 var server = restify.createServer();
+server.use(restify.queryParser());  
+
+
+server.get("/api/oauthcallback", function (req, res, next) {  
+    console.log("OAUTH CALLBACK");  
+    var authCode = req.query.code,  
+    address = JSON.parse(req.query.state),  
+    oauth = getOAuthClient();      
+    oauth.getToken(authCode, function (err, tokens) {  
+    if (!err) {  
+        bot.beginDialog(address, "/oauth-success", tokens);  
+    }  
+        res.send(200, {});  
+    });  
+});  
+
 server.listen(process.env.port || process.env.PORT || 3978, function () {
     console.log('%s listening to %s', server.name, server.url);
 });
+
+
 
 var connector = new builder.ChatConnector({
     appId: process.env.MICROSOFT_APP_ID,
@@ -144,6 +165,9 @@ var bot = new builder.UniversalBot(connector, [
         }
         else if(session.dialogData.select.type=='5'){
             session.beginDialog('customvision');
+        }
+        else if(session.dialogData.select.type=='6'){
+            session.beginDialog('auth');
         }
         else {
             //session.send("You said: %s", session.message.text);
@@ -355,17 +379,57 @@ bot.dialog('customvision',[
     },
     function(session,results){
        if(results.response && results.response.length>0){
-            var attachment = results.response[0];
-            session.send({
-                text:'you sent:',
-                attachments:[
-                    {
-                        contentType: attachment.contentType,
-                        contentUrl: attachment.contentUrl,
-                        name: attachment.name
-                    }
-                ]
+            var attachment = results.response[0].contentUrl;
+
+            var image = Jimp.read(attachment,function(image){
+                image.getBase64( mime, cb );
             });
+
+            var CustomVisionEndpoint = 'https://southcentralus.api.cognitive.microsoft.com/customvision/v1.0/Prediction/';        
+            var CustomVisionApi = 'image';
+            var lKnowledgeBaseId = 'e1381295-16e1-4073-9ea9-c9585e8ffe10';
+            var lSubscriptionKey = '79ea46b6255542e285abd8d1be7249fe';
+            var lKbUri = CustomVisionEndpoint + lKnowledgeBaseId + '/' + CustomVisionApi;
+
+            request({
+                url: lKbUri,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'Prediction-Key': lSubscriptionKey
+                },               
+                body: image
+                //encoding: null  
+                              
+            },
+            function (error, response, body){
+                // var lResult;
+                // var stopQNA;
+                if(!error){
+                    // lResult = JSON.parse(body);
+                    console.log('Response: ', response.body);
+                }else{
+                    // lResult.answer = "Unfortunately an error occurred. Try again.(fQnAMaker)";
+                    // lResult.score = 0;
+                    console.log('Error sending message: ', error);
+                }
+                
+                //session.send(lResult.answers[0].answer);        
+                session.replaceDialog("customvision",{reprompt: true});                    
+            })
+
+            // session.send({
+            //     text:'you sent:',
+            //     attachments:[
+            //         {
+            //             contentType: attachment.contentType,
+            //             contentUrl: attachment.contentUrl,
+            //             name: attachment.name
+            //         }
+            //     ]
+            // });
+
+
         }
         else{
             session.send("%s 라고 말씀하셨죠?",session.message.text);
@@ -373,6 +437,61 @@ bot.dialog('customvision',[
     }
 ]);
 
+var scopes = [  
+    "https://www.googleapis.com/auth/contacts.readonly",  
+    "https://www.googleapis.com/auth/userinfo.profile"  
+]  
+
+bot.dialog('auth',[
+    function(session)
+    {
+        builder.Prompts.text(session,"이름이 뭐에요?");
+    },
+    function(session,results){
+        if(results.response == "login"){
+            var oauth = new oAuth2('325764317905-j31n8lcp6h4pmink28i33g42njic8hpe.apps.googleusercontent.com', 'jGpjcoo6NKgnMer4nkAUi3BY', 'https://eunkauth.azurewebsites.net/.auth/login/google/callback'); 
+            url = oauth.generateAuthUrl({ access_type: "online", scope: scopes }) +  
+            "&state=" + encodeURIComponent(JSON.stringify(session.message.address));
+
+            session.send(new builder.Message(session).addAttachment(  
+                new builder.SigninCard(session)  
+                .text("Authenticate with Google")  
+                .button("Sign-In", url))  
+                );  
+        }
+        else{
+            session.endDialog();
+        }
+    }
+]);
+
+bot.dialog("/oauth-success", function (session, tokens) {  
+    var people = google.people("v1"), oauth = getOAuthClient();  
+ 
+    // save the tokens in the private conversation  
+    session.privateConversationData.tokens = tokens;  
+     
+    // tell the user we authenticated successfully  
+    session.send("oAuth Success!");  
+    
+    // set the credentials used for our api call  
+    oauth.setCredentials(tokens);  
+      
+    // get the authenticated user's name so the bot can be more personalized  
+    people.people.get({ resourceName: "people/me", auth: oauth }, function (err, response) {  
+        if (!err) {  
+            if (response.names && response.names.length > 0) {  
+                var name = response.names[0].givenName || response.names[0].displayName;  
+                session.privateConversationData.name = name;  
+                session.send("Nice to meet you, %s!", name);  
+            }     
+        } 
+        else {  
+            session.send("There was an error retrieving your profile.");  
+        }  
+        session.endDialog();  
+    });  
+});  
 
 bot.dialog('softbyEvent', [
     function (session) {
