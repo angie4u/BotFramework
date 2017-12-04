@@ -95,6 +95,12 @@ function getCardAttachments(session) {
             .text('자주 묻는 질문에 답해드립니다')
             .images([builder.CardImage.create(session, 'https://home.llu.edu/sites/home.llu.edu/files/images/Assessment/Newsletter/faqs.jpg')])
             .buttons([builder.CardAction.imBack(session, "4", "4.FAQ")]),
+        new builder.HeroCard(session)
+            .title('5. Custom Vision')
+            .subtitle('커스텀 비전')
+            .text('보석 이미지 검색 기능')
+            .images([builder.CardImage.create(session, 'https://home.llu.edu/sites/home.llu.edu/files/images/Assessment/Newsletter/faqs.jpg')])
+            .buttons([builder.CardAction.imBack(session, "5", "5.Custom Vision")]),
     ];
 }
 
@@ -135,6 +141,9 @@ var bot = new builder.UniversalBot(connector, [
             //session.send("궁금하신 질문을 입력해주세요, 그만하시려면 '그만'이라고 입력해주세요");
             //session.userData.early = {};
             session.beginDialog('qnamaker');
+        }
+        else if(session.dialogData.select.type=='5'){
+            session.beginDialog('customvision');
         }
         else {
             //session.send("You said: %s", session.message.text);
@@ -338,6 +347,30 @@ bot.dialog('qnamaker', [
             }
         }
     },
+]);
+
+bot.dialog('customvision',[
+    function(session){
+        builder.Prompts.attachment(session,'cucstom vison 처리를 위한 img를 업로드 해주세요;)');
+    },
+    function(session,results){
+       if(results.response && results.response.length>0){
+            var attachment = results.response[0];
+            session.send({
+                text:'you sent:',
+                attachments:[
+                    {
+                        contentType: attachment.contentType,
+                        contentUrl: attachment.contentUrl,
+                        name: attachment.name
+                    }
+                ]
+            });
+        }
+        else{
+            session.send("%s 라고 말씀하셨죠?",session.message.text);
+        }
+    }
 ]);
 
 
