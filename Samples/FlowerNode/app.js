@@ -5,10 +5,21 @@ var restify = require('restify'),
     validUrl = require('valid-url'),
     imageService = require('./image-service'),
     azure = require('botbuilder-azure'),
+    needle = require('needle'),    
+   
     cognitiveservices = require('botbuilder-cognitiveservices');
 
+var request = require('request');
+var path = require('path');
 var google = require('googleapis');
 var oAuth2 = google.auth.OAuth2;
+var fs = require('fs');
+var Jimp = require("jimp");
+
+var azurestorage = require('azure-storage');
+var connectionString = 'DefaultEndpointsProtocol=https;AccountName=memefunctionstorage;AccountKey=/rOwErr/F+yO3TupawAPHZP8ZMvWSr5DVL9WucLnGGSHkcFvk2dsctTgA1A79HmFw/2ZRrv7AhxAe4ljYdmKAw==;EndpointSuffix=core.windows.net';
+var blobSvc = azurestorage.createBlobService(connectionString);
+
 
 var documentDbOptions = {
     host: 'flowergallery.documents.azure.com',
@@ -182,24 +193,25 @@ var bot = new builder.UniversalBot(connector, [
 
         session.send('원하는 서비스를 입력하세요(예시: 꽃 선물 / 꽃꽃이 강좌안내 / 꽃 이미지 검색)');
     }
-])
-.set('storage', tableStorage);
+]);
+//.set('storage', tableStorage);
 
 bot.on('conversationUpdate', function (message) {
     if (message.membersAdded) {
         message.membersAdded.forEach(function (identity) {
             if (identity.id === message.address.bot.id) {
-                var reply = new builder.Message()
-                    .address(message.address)
-                    .text('안녕하세요, 꽃과 관련된 서비스를 하는 봇 입니다!');
-                bot.send(reply);
+                // var reply = new builder.Message()
+                //     .address(message.address)
+                //     .text('안녕하세요, 꽃과 관련된 서비스를 하는 봇 입니다!');
+                // bot.send(reply);
+                bot.beginDialog(message.address, '/');
             }
         });
     }
 });
 
 
-//bot.recognizer(new builder.LuisRecognizer(luisAppUrl));
+bot.recognizer(new builder.LuisRecognizer(luisAppUrl));
 
 
 bot.dialog('getUserData', [
@@ -373,17 +385,119 @@ bot.dialog('qnamaker', [
     },
 ]);
 
+
+function base64_encode(file) {
+    // read binary data
+    var bitmap = fs.readFileSync(file);
+    // convert binary data to base64 encoded string
+    return new Buffer(bitmap).toString('base64');
+}
+
+function base64_encode(file) {
+    // read binary data
+    var bitmap = fs.readFileSync(file);
+    fs.readdirSync
+    // convert binary data to base64 encoded string
+    return new Buffer(bitmap).toString('base64');
+}
+
+
+// Request file with Authentication Header
+
+// Promise for obtaining JWT Token (requested once)
+
+
+bot.dialog('bejewel',[
+    function (session) {
+        if (hasImageAttachment(session)) {
+            var stream = getImageStreamFromMessage(session.message);
+            stream.pipe(blobSvc.createWriteStreamToBlockBlob('output',session.message.attachments[0].name));
+        } else {
+            session.send('보석 이미지를 업로드 해주세요! :)');
+        }
+    }
+]).triggerAction({
+    matches: /^bejewel$/i,
+});
+
+function hasImageAttachment(session) {
+    return session.message.attachments.length > 0 &&
+        session.message.attachments[0].contentType.indexOf('image') !== -1;
+}
+
+
+function getImageStreamFromMessage(message) {
+    var headers = {};
+    var attachment = message.attachments[0];
+    if (checkRequiresToken(message)) {
+        // The Skype attachment URLs are secured by JwtToken,
+        // you should set the JwtToken of your bot as the authorization header for the GET request your bot initiates to fetch the image.
+        // https://github.com/Microsoft/BotBuilder/issues/662
+        connector.getAccessToken(function (error, token) {
+            var tok = token;
+            headers['Authorization'] = 'Bearer ' + token;
+            headers['Content-Type'] = 'application/octet-stream';
+
+            return needle.get(attachment.contentUrl, { headers: headers });
+        });
+    }
+
+    headers['Content-Type'] = attachment.contentType;
+    return needle.get(attachment.contentUrl, { headers: headers });
+}
+
+function checkRequiresToken(message) {
+    return message.source === 'skype' || message.source === 'msteams';
+}
+
+/**
+ * Gets the href value in an anchor element.
+ * Skype transforms raw urls to html. Here we extract the href value from the url
+ * @param {string} input Anchor Tag
+ * @return {string} Url matched or null
+ */
+function parseAnchorTag(input) {
+    var match = input.match('^<a href=\"([^\"]*)\">[^<]*</a>$');
+    if (match && match[1]) {
+        return match[1];
+    }
+
+    return null;
+}
+
 bot.dialog('customvision',[
     function(session){
         builder.Prompts.attachment(session,'cucstom vison 처리를 위한 img를 업로드 해주세요;)');
-    },
-    function(session,results){
-       if(results.response && results.response.length>0){
-            var attachment = results.response[0].contentUrl;
 
-            var image = Jimp.read(attachment,function(image){
-                image.getBase64( mime, cb );
-            });
+       
+            // request.post({
+            //     url: 'https://northeurope.api.cognitive.microsoft.com/vision/v1.0/analyze?visualFeatures',
+            //     encoding: null,
+            //     json: true,
+            //     headers: {
+            //       'Content-Type': 'application/json',
+            //       'Ocp-Apim-Subscription-Key': 'Your API Key...'
+            //     },
+            //     body: session.message.attachments[0]
+            //   },
+            // function (err, response, body) {
+            // if (err) return console.log(err)
+            // console.log(body);
+            // });
+        },
+    function(session,results){
+
+    
+        
+       if(results.response && results.response.length>0){
+            var imgUrl = results.response[0].contentUrl;
+            var imgName = results.response[0].name;
+            //var info = path.resolve(imgUrl);
+
+            // var dirValue = path.resolve(imgUrl, imgName);
+            // var bitmap = fs.readFileSync(dirValue);
+            
+            
 
             var CustomVisionEndpoint = 'https://southcentralus.api.cognitive.microsoft.com/customvision/v1.0/Prediction/';        
             var CustomVisionApi = 'image';
@@ -391,18 +505,20 @@ bot.dialog('customvision',[
             var lSubscriptionKey = '79ea46b6255542e285abd8d1be7249fe';
             var lKbUri = CustomVisionEndpoint + lKnowledgeBaseId + '/' + CustomVisionApi;
 
-            request({
+            var options = {
                 url: lKbUri,
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/octet-stream',
                     'Prediction-Key': lSubscriptionKey
-                },               
-                body: image
-                //encoding: null  
-                              
-            },
-            function (error, response, body){
+                },       
+                body: results.response[0].contentUrl     
+                
+            };
+
+   
+
+            request(options, function (error, response, body){
                 // var lResult;
                 // var stopQNA;
                 if(!error){
@@ -418,16 +534,20 @@ bot.dialog('customvision',[
                 session.replaceDialog("customvision",{reprompt: true});                    
             })
 
-            // session.send({
-            //     text:'you sent:',
-            //     attachments:[
-            //         {
-            //             contentType: attachment.contentType,
-            //             contentUrl: attachment.contentUrl,
-            //             name: attachment.name
-            //         }
-            //     ]
-            // });
+
+
+            
+
+    //         // session.send({
+    //         //     text:'you sent:',
+    //         //     attachments:[
+    //         //         {
+    //         //             contentType: attachment.contentType,
+    //         //             contentUrl: attachment.contentUrl,
+    //         //             name: attachment.name
+    //         //         }
+    //         //     ]
+    //         // });
 
 
         }
@@ -435,6 +555,7 @@ bot.dialog('customvision',[
             session.send("%s 라고 말씀하셨죠?",session.message.text);
         }
     }
+
 ]);
 
 var scopes = [  
