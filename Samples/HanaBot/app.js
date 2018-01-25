@@ -54,6 +54,8 @@ bot.dialog('booking', [
       console.log(session.message.value)
     }
 
+    // 지금 adaptive card 끝나고 돌아왔을때 값 처리하는 부분에서 막힘. next 쓰고 이미 물어본거면 안물어보게끔 처리하면 될듯
+
     if (args) {
       booking.product = args.product
     }
